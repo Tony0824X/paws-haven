@@ -1,0 +1,9 @@
+
+{
+  "name": "Paws Haven - 寵物領養平台",
+  "description": "A comprehensive pet adoption platform featuring discovery, detailed pet stories, adoption application tracking, and AI-powered chat with volunteers.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
