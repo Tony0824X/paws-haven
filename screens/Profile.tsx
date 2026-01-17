@@ -25,6 +25,8 @@ const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateHome, favorites, pe
   const [isLoading, setIsLoading] = useState(true);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [viewingApp, setViewingApp] = useState<Application | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     async function loadUserData() {
@@ -88,6 +90,10 @@ const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateHome, favorites, pe
     }
   };
 
+  const handleViewDetails = (app: Application) => {
+    setViewingApp(app);
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background-light dark:bg-background-dark">
@@ -142,10 +148,15 @@ const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateHome, favorites, pe
           <section className="mt-4 px-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-bold">申請進度</h3>
-              <button className="text-primary text-sm font-bold">歷史紀錄</button>
+              <button
+                onClick={() => setShowHistory(true)}
+                className="text-primary text-sm font-bold"
+              >
+                歷史紀錄
+              </button>
             </div>
             <div className="space-y-3">
-              {applications.map(app => (
+              {applications.slice(0, 2).map(app => (
                 <div key={app.id} className="flex items-center gap-4 rounded-2xl border border-primary/5 bg-white dark:bg-zinc-900/50 p-4 shadow-sm">
                   <div className={`size-12 rounded-xl flex items-center justify-center shrink-0 ${app.status === '審核中' ? 'bg-amber-100 text-amber-600' : app.status === '已通過' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
                     <span className="material-symbols-outlined text-2xl">{app.status === '審核中' ? 'hourglass_top' : app.status === '已通過' ? 'task_alt' : 'cancel'}</span>
@@ -154,9 +165,19 @@ const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateHome, favorites, pe
                     <h4 className="text-base font-bold">{app.petName} 的申請</h4>
                     <p className="text-[#9a6c4c] text-xs font-medium">{app.petBreed} • {app.status}</p>
                   </div>
-                  <button className="text-primary font-bold text-xs bg-primary/5 px-3 py-2 rounded-lg">查看詳情</button>
+                  <button
+                    onClick={() => handleViewDetails(app)}
+                    className="text-primary font-bold text-xs bg-primary/5 px-3 py-2 rounded-lg"
+                  >
+                    查看詳情
+                  </button>
                 </div>
               ))}
+              {applications.length === 0 && (
+                <div className="text-center py-10 bg-white dark:bg-zinc-900/50 rounded-2xl border border-dashed border-primary/10">
+                  <p className="text-zinc-500 text-sm">目前沒有申請中的毛孩</p>
+                </div>
+              )}
             </div>
           </section>
         )}
@@ -236,6 +257,102 @@ const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateHome, favorites, pe
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Application Detail Modal */}
+      {viewingApp && (
+        <div className="fixed inset-0 z-[101] bg-black/60 backdrop-blur-sm flex items-end justify-center animate-in fade-in duration-200 p-4 font-sans">
+          <div className="bg-white dark:bg-zinc-900 rounded-[2rem] w-full max-w-sm overflow-hidden animate-in slide-in-from-bottom duration-300">
+            <div className="relative p-6">
+              <button
+                onClick={() => setViewingApp(null)}
+                className="absolute top-4 right-4 size-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-zinc-800"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+
+              <div className="flex flex-col items-center text-center mb-6 pt-4">
+                <div className={`size-16 rounded-full flex items-center justify-center mb-4 ${viewingApp.status === '審核中' ? 'bg-amber-100 text-amber-600' : viewingApp.status === '已通過' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                  <span className="material-symbols-outlined text-4xl">{viewingApp.status === '審核中' ? 'hourglass_top' : viewingApp.status === '已通過' ? 'task_alt' : 'cancel'}</span>
+                </div>
+                <h3 className="text-xl font-bold">{viewingApp.petName} 的領養申請</h3>
+                <p className="text-[#9a6c4c] text-sm mt-1">{viewingApp.petBreed} • {viewingApp.status}</p>
+              </div>
+
+              <div className="space-y-4 max-h-[40vh] overflow-y-auto px-2">
+                <div className="bg-gray-50 dark:bg-zinc-800/50 p-4 rounded-2xl">
+                  <p className="text-xs text-zinc-500 mb-1 font-bold">申請時間</p>
+                  <p className="text-sm font-medium">{new Date(viewingApp.createdAt || '').toLocaleString('zh-TW')}</p>
+                </div>
+
+                {viewingApp.reviewerNotes && (
+                  <div className="bg-primary/5 p-4 rounded-2xl border border-primary/10">
+                    <p className="text-xs text-primary mb-1 font-bold">志工回覆</p>
+                    <p className="text-sm font-medium">{viewingApp.reviewerNotes}</p>
+                  </div>
+                )}
+
+                <div className="bg-gray-50 dark:bg-zinc-800/50 p-4 rounded-2xl">
+                  <p className="text-xs text-zinc-500 mb-2 font-bold uppercase tracking-wider">進度說明</p>
+                  <p className="text-sm text-[#1b130d] dark:text-zinc-300 leading-relaxed font-medium">
+                    {viewingApp.status === '審核中'
+                      ? "您的申請已收到，志工們正在快馬加鞭審核中。請保持聯絡電話暢通，我們可能會與您進一步聯繫。"
+                      : viewingApp.status === '已通過'
+                        ? "恭喜您通過領養審核！我們已為您保留了這位小朋友，志工將在 24 小時內聯繫您安排現場核對與接領。"
+                        : "謝謝您的申請。經過評估，目前的生活環境可能暫不適合領養該毛孩。歡迎隨時參考其他待領養的小可愛。"}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setViewingApp(null)}
+                className="w-full mt-6 h-14 bg-primary text-white font-bold rounded-2xl shadow-lg shadow-primary/20"
+              >
+                關閉詳情
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* History Modal */}
+      {showHistory && (
+        <div className="fixed inset-0 z-[100] bg-background-light dark:bg-background-dark animate-in fade-in duration-300">
+          <header className="flex items-center p-4 border-b border-primary/5 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md">
+            <button onClick={() => setShowHistory(false)} className="size-12 flex items-center justify-start ml-2">
+              <span className="material-symbols-outlined">arrow_back_ios_new</span>
+            </button>
+            <h2 className="text-lg font-bold flex-1 text-center">領養歷史紀錄</h2>
+            <div className="size-12"></div>
+          </header>
+
+          <main className="p-4 space-y-4 max-w-md mx-auto overflow-y-auto h-[calc(100vh-80px)] pb-10">
+            {applications.length > 0 ? (
+              applications.map(app => (
+                <div
+                  key={app.id}
+                  onClick={() => handleViewDetails(app)}
+                  className="flex items-center gap-4 rounded-3xl border border-primary/5 bg-white dark:bg-zinc-900/50 p-5 shadow-sm active:scale-95 transition-transform cursor-pointer"
+                >
+                  <div className={`size-14 rounded-2xl flex items-center justify-center shrink-0 ${app.status === '審核中' ? 'bg-amber-100 text-amber-600' : app.status === '已通過' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                    <span className="material-symbols-outlined text-3xl">{app.status === '審核中' ? 'hourglass_top' : app.status === '已通過' ? 'task_alt' : 'cancel'}</span>
+                  </div>
+                  <div className="flex flex-col flex-1">
+                    <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{new Date(app.createdAt || '').toLocaleDateString('zh-TW')}</span>
+                    <h4 className="text-lg font-bold">{app.petName}</h4>
+                    <p className="text-[#9a6c4c] text-xs font-medium">{app.status}</p>
+                  </div>
+                  <span className="material-symbols-outlined text-zinc-300">chevron_right</span>
+                </div>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <span className="material-symbols-outlined text-6xl text-zinc-200 mb-4">history</span>
+                <p className="text-zinc-500">尚無任何領養紀錄</p>
+              </div>
+            )}
+          </main>
         </div>
       )}
     </div>

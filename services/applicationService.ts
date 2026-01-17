@@ -12,6 +12,7 @@ function dbApplicationToApplication(dbApp: DbApplication & { pets?: { name: stri
         petId: dbApp.pet_id,
         userId: dbApp.user_id,
         createdAt: dbApp.created_at,
+        reviewerNotes: dbApp.reviewer_notes,
     };
 }
 
@@ -192,18 +193,37 @@ export async function updateApplicationStatus(
         return false;
     }
 
-    const { error } = await supabase
+    const userId = await getCurrentUserId();
+
+    // 1. Update the application status
+    const { data: applicationData, error: updateError } = await supabase
         .from('applications')
         .update({
             status,
             reviewer_notes: reviewerNotes,
             reviewed_at: new Date().toISOString(),
+            reviewed_by: userId,
         })
-        .eq('id', id);
+        .eq('id', id)
+        .select('pet_id')
+        .single();
 
-    if (error) {
-        console.error('Error updating application status:', error);
+    if (updateError) {
+        console.error('Error updating application status:', updateError);
         return false;
+    }
+
+    // 2. If approved, update the pet's status to 'adopted'
+    if (status === '已通過' && applicationData?.pet_id) {
+        const { error: petError } = await supabase
+            .from('pets')
+            .update({ status: 'adopted' })
+            .eq('id', applicationData.pet_id);
+
+        if (petError) {
+            console.error('Error updating pet status after approval:', petError);
+            // We don't return false here because the application status WAS updated
+        }
     }
 
     return true;

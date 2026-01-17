@@ -70,6 +70,7 @@ export interface DbUser {
     name: string;
     avatar_url: string;
     badge: string;
+    role: 'user' | 'admin';
     created_at: string;
     updated_at: string;
 }
@@ -85,8 +86,11 @@ export interface DbApplication {
     id: string;
     user_id: string;
     pet_id: string;
-    status: '審核中' | '已通過' | '未通過';
+    status: '審核中' | '已通過' | '未通過' | '已取消';
     form_data: Record<string, unknown>;
+    reviewer_notes?: string;
+    reviewed_at?: string;
+    reviewed_by?: string;
     created_at: string;
     updated_at: string;
 }

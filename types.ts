@@ -44,6 +44,7 @@ export interface Application {
   petId?: string;
   userId?: string;
   createdAt?: string;
+  reviewerNotes?: string;
 }
 
 export interface User {
