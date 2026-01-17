@@ -9,16 +9,19 @@ import Profile from './screens/Profile';
 import Favorites from './screens/Favorites';
 import ChatList from './screens/ChatList';
 import Landing from './screens/Landing';
+import AdminDashboard from './screens/AdminDashboard';
 
 // Import services
 import { getPets } from './services/petService';
 import { getFavoriteIds, toggleFavorite as toggleFavoriteService } from './services/favoriteService';
 import { isAuthenticated, getCurrentAuthUser, signOut, AuthUser } from './services/authService';
+import { getCurrentUser, User } from './services/userService';
 import { MOCK_PETS } from './constants';
 
 const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null); // null = checking
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [userRole, setUserRole] = useState<'user' | 'admin'>('user');
   const [currentScreen, setCurrentScreen] = useState<Screen>(Screen.HOME);
   const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -32,41 +35,45 @@ const App: React.FC = () => {
       const authenticated = await isAuthenticated();
       setIsLoggedIn(authenticated);
       if (authenticated) {
-        const user = await getCurrentAuthUser();
-        setCurrentUser(user);
+        const authUser = await getCurrentAuthUser();
+        setCurrentUser(authUser);
+
+        // Fetch DB user for role
+        const dbUser = await getCurrentUser();
+        if (dbUser) {
+          setUserRole(dbUser.role);
+          if (dbUser.role === 'admin') {
+            setCurrentScreen(Screen.ADMIN_DASHBOARD);
+          }
+        }
       }
     }
     checkAuth();
   }, []);
 
-  // Load pets and favorites after login
+  // Load pets and favorites after login (only for normal users)
   useEffect(() => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn || userRole === 'admin') return;
 
     async function loadData() {
       setIsLoading(true);
       try {
-        // Try to load from Supabase
         const [petsData, favoritesData] = await Promise.all([
           getPets(),
           getFavoriteIds(),
         ]);
 
-        // If Supabase returns data, use it
         if (petsData.length > 0) {
           setPets(petsData);
           setFavorites(favoritesData);
           setUseSupabase(true);
         } else {
-          // Fallback to mock data if Supabase is not configured
-          console.log('Supabase not configured or no data. Using mock data.');
           setPets(MOCK_PETS);
           setFavorites(['1', '4']);
           setUseSupabase(false);
         }
       } catch (error) {
         console.error('Error loading data:', error);
-        // Fallback to mock data
         setPets(MOCK_PETS);
         setFavorites(['1', '4']);
         setUseSupabase(false);
@@ -76,18 +83,28 @@ const App: React.FC = () => {
     }
 
     loadData();
-  }, [isLoggedIn]);
+  }, [isLoggedIn, userRole]);
 
   const handleLogin = async () => {
     setIsLoggedIn(true);
-    const user = await getCurrentAuthUser();
-    setCurrentUser(user);
+    const authUser = await getCurrentAuthUser();
+    setCurrentUser(authUser);
+
+    // Fetch DB user for role
+    const dbUser = await getCurrentUser();
+    if (dbUser) {
+      setUserRole(dbUser.role);
+      if (dbUser.role === 'admin') {
+        setCurrentScreen(Screen.ADMIN_DASHBOARD);
+      }
+    }
   };
 
   const handleLogout = async () => {
     await signOut();
     setIsLoggedIn(false);
     setCurrentUser(null);
+    setUserRole('user');
     setCurrentScreen(Screen.HOME);
   };
 
@@ -99,7 +116,6 @@ const App: React.FC = () => {
 
   const toggleFavorite = async (id: string) => {
     if (useSupabase) {
-      // Use Supabase service
       const result = await toggleFavoriteService(id);
       if (result.isFavorite) {
         setFavorites(prev => [...prev, id]);
@@ -107,12 +123,10 @@ const App: React.FC = () => {
         setFavorites(prev => prev.filter(f => f !== id));
       }
     } else {
-      // Fallback to local state
       setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
     }
   };
 
-  // Show loading while checking auth
   if (isLoggedIn === null) {
     return (
       <div className="max-w-[480px] mx-auto min-h-screen bg-background-light dark:bg-background-dark flex flex-col items-center justify-center gap-4">
@@ -124,7 +138,6 @@ const App: React.FC = () => {
     );
   }
 
-  // Show landing/login if not authenticated
   if (!isLoggedIn) {
     return (
       <div className="max-w-[480px] mx-auto min-h-screen bg-background-light dark:bg-background-dark relative shadow-2xl overflow-x-hidden">
@@ -134,7 +147,7 @@ const App: React.FC = () => {
   }
 
   const renderScreen = () => {
-    if (isLoading) {
+    if (isLoading && userRole !== 'admin') {
       return (
         <div className="flex flex-col items-center justify-center min-h-screen gap-4">
           <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -143,6 +156,31 @@ const App: React.FC = () => {
       );
     }
 
+    // Special handling for Admin
+    if (userRole === 'admin') {
+      switch (currentScreen) {
+        case Screen.ADMIN_DASHBOARD:
+          return <AdminDashboard onNavigate={(screen) => setCurrentScreen(screen)} />;
+        case Screen.PROFILE:
+          return (
+            <Profile
+              onBack={() => setCurrentScreen(Screen.ADMIN_DASHBOARD)}
+              onNavigateHome={() => setCurrentScreen(Screen.ADMIN_DASHBOARD)}
+              favorites={[]}
+              pets={[]}
+              onSelectPet={() => { }}
+              onNavigate={(screen) => setCurrentScreen(screen)}
+              currentScreen={currentScreen}
+              currentUser={currentUser}
+              onLogout={handleLogout}
+            />
+          );
+        default:
+          return <AdminDashboard onNavigate={(screen) => setCurrentScreen(screen)} />;
+      }
+    }
+
+    // Normal User Screens
     switch (currentScreen) {
       case Screen.HOME:
         return <Home

@@ -1,19 +1,6 @@
-import { getSupabase, DEMO_USER_ID, DbApplication, isSupabaseConfigured } from './supabase';
+import { getSupabase, DbApplication, isSupabaseConfigured } from './supabase';
 import { getCurrentUserId } from './authService';
-import { Application } from '../types';
-
-interface ApplicationFormData {
-    name: string;
-    phone: string;
-    email: string;
-    job: string;
-    experience: string;
-    environment: string;
-    companionTime: string;
-    reason: string;
-    commitment: boolean;
-    followup: boolean;
-}
+import { Application, ApplicationFormData } from '../types';
 
 // Convert database application to frontend Application type
 function dbApplicationToApplication(dbApp: DbApplication & { pets?: { name: string; breed: string } }): Application {
@@ -21,7 +8,10 @@ function dbApplicationToApplication(dbApp: DbApplication & { pets?: { name: stri
         id: dbApp.id,
         petName: dbApp.pets?.name || 'Unknown',
         petBreed: dbApp.pets?.breed || 'Unknown',
-        status: dbApp.status,
+        status: dbApp.status as any,
+        petId: dbApp.pet_id,
+        userId: dbApp.user_id,
+        createdAt: dbApp.created_at,
     };
 }
 
@@ -35,7 +25,6 @@ export async function submitApplication(
     const supabase = getSupabase();
 
     if (!isSupabaseConfigured() || !supabase) {
-        // Return success even without Supabase for demo purposes
         console.log('Supabase not configured, simulating application submission');
         return { success: true, id: 'demo-' + Date.now() };
     }
@@ -47,8 +36,6 @@ export async function submitApplication(
         console.error('No authenticated user found');
         return { success: false, error: '請先登入' };
     }
-
-    console.log('Submitting application for user:', userId, 'pet:', petId);
 
     const { data, error } = await supabase
         .from('applications')
@@ -66,7 +53,6 @@ export async function submitApplication(
         return { success: false, error: error.message };
     }
 
-    console.log('Application submitted successfully:', data.id);
     return { success: true, id: data.id };
 }
 
@@ -83,7 +69,6 @@ export async function getApplications(): Promise<Application[]> {
     const userId = await getCurrentUserId();
 
     if (!userId) {
-        console.log('No authenticated user, returning empty applications');
         return [];
     }
 
@@ -161,6 +146,86 @@ export async function hasActiveApplication(petId: string): Promise<boolean> {
         .maybeSingle();
 
     if (error || !data) {
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Get all applications (admin view)
+ */
+export async function getAllApplicationsAdmin(): Promise<Application[]> {
+    const supabase = getSupabase();
+
+    if (!isSupabaseConfigured() || !supabase) {
+        return [];
+    }
+
+    const { data, error } = await supabase
+        .from('applications')
+        .select(`
+      *,
+      pets (name, breed)
+    `)
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching all applications for admin:', error);
+        return [];
+    }
+
+    return (data || []).map(dbApplicationToApplication);
+}
+
+/**
+ * Update application status (admin only)
+ */
+export async function updateApplicationStatus(
+    id: string,
+    status: '審核中' | '已通過' | '未通過' | '已取消',
+    reviewerNotes?: string
+): Promise<boolean> {
+    const supabase = getSupabase();
+
+    if (!isSupabaseConfigured() || !supabase) {
+        return false;
+    }
+
+    const { error } = await supabase
+        .from('applications')
+        .update({
+            status,
+            reviewer_notes: reviewerNotes,
+            reviewed_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+
+    if (error) {
+        console.error('Error updating application status:', error);
+        return false;
+    }
+
+    return true;
+}
+
+/**
+ * Delete an application (admin only)
+ */
+export async function deleteApplication(id: string): Promise<boolean> {
+    const supabase = getSupabase();
+
+    if (!isSupabaseConfigured() || !supabase) {
+        return false;
+    }
+
+    const { error } = await supabase
+        .from('applications')
+        .delete()
+        .eq('id', id);
+
+    if (error) {
+        console.error('Error deleting application:', error);
         return false;
     }
 

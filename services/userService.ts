@@ -1,18 +1,21 @@
 import { getSupabase, DbUser, isSupabaseConfigured } from './supabase';
 import { getCurrentUserId } from './authService';
+import { User as UserType } from '../types';
 
-export interface User {
-    id: string;
-    email: string;
-    name: string;
-    avatarUrl: string;
-    badge: string;
-}
+export interface User extends UserType { }
 
 export interface UserStats {
     favoritesCount: number;
     pendingApplicationsCount: number;
     adoptedCount: number;
+}
+
+export interface AdminStats {
+    totalPets: number;
+    totalApplications: number;
+    pendingApplications: number;
+    adoptedPets: number;
+    totalUsers: number;
 }
 
 // Convert database user to frontend User type
@@ -23,6 +26,7 @@ function dbUserToUser(dbUser: DbUser): User {
         name: dbUser.name,
         avatarUrl: dbUser.avatar_url,
         badge: dbUser.badge,
+        role: (dbUser as any).role || 'user',
     };
 }
 
@@ -44,8 +48,6 @@ export async function getCurrentUser(): Promise<User | null> {
         return null;
     }
 
-    console.log('Getting user profile for:', userId);
-
     const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -57,7 +59,6 @@ export async function getCurrentUser(): Promise<User | null> {
         return null;
     }
 
-    console.log('User profile:', data);
     return data ? dbUserToUser(data) : null;
 }
 
@@ -97,52 +98,64 @@ export async function updateProfile(
 }
 
 /**
- * Get user statistics (favorites count, pending applications, adopted count)
+ * Get user statistics
  */
 export async function getUserStats(): Promise<UserStats> {
     const supabase = getSupabase();
 
     if (!isSupabaseConfigured() || !supabase) {
-        return {
-            favoritesCount: 0,
-            pendingApplicationsCount: 0,
-            adoptedCount: 0,
-        };
+        return { favoritesCount: 0, pendingApplicationsCount: 0, adoptedCount: 0 };
     }
 
     const userId = await getCurrentUserId();
+    if (!userId) return { favoritesCount: 0, pendingApplicationsCount: 0, adoptedCount: 0 };
 
-    if (!userId) {
-        return {
-            favoritesCount: 0,
-            pendingApplicationsCount: 0,
-            adoptedCount: 0,
-        };
-    }
-
-    // Get favorites count
-    const { count: favoritesCount } = await supabase
-        .from('favorites')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId);
-
-    // Get pending applications count
-    const { count: pendingCount } = await supabase
-        .from('applications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('status', '審核中');
-
-    // Get adopted count (approved applications)
-    const { count: adoptedCount } = await supabase
-        .from('applications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('status', '已通過');
+    const [
+        { count: favoritesCount },
+        { count: pendingCount },
+        { count: adoptedCount }
+    ] = await Promise.all([
+        supabase.from('favorites').select('*', { count: 'exact', head: true }).eq('user_id', userId),
+        supabase.from('applications').select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('status', '審核中'),
+        supabase.from('applications').select('*', { count: 'exact', head: true }).eq('user_id', userId).eq('status', '已通過')
+    ]);
 
     return {
         favoritesCount: favoritesCount || 0,
         pendingApplicationsCount: pendingCount || 0,
         adoptedCount: adoptedCount || 0,
+    };
+}
+
+/**
+ * Get Admin dashboard statistics
+ */
+export async function getAdminStats(): Promise<AdminStats> {
+    const supabase = getSupabase();
+
+    if (!isSupabaseConfigured() || !supabase) {
+        return { totalPets: 0, totalApplications: 0, pendingApplications: 0, adoptedPets: 0, totalUsers: 0 };
+    }
+
+    const [
+        { count: totalPets },
+        { count: totalApps },
+        { count: pendingApps },
+        { count: adoptedPets },
+        { count: totalUsers }
+    ] = await Promise.all([
+        supabase.from('pets').select('*', { count: 'exact', head: true }),
+        supabase.from('applications').select('*', { count: 'exact', head: true }),
+        supabase.from('applications').select('*', { count: 'exact', head: true }).eq('status', '審核中'),
+        supabase.from('applications').select('*', { count: 'exact', head: true }).eq('status', '已通過'),
+        supabase.from('users').select('*', { count: 'exact', head: true })
+    ]);
+
+    return {
+        totalPets: totalPets || 0,
+        totalApplications: totalApps || 0,
+        pendingApplications: pendingApps || 0,
+        adoptedPets: adoptedPets || 0,
+        totalUsers: totalUsers || 0,
     };
 }

@@ -125,44 +125,58 @@ const Profile: React.FC<ProfileProps> = ({ onBack, onNavigateHome, favorites, pe
             <p className="text-[#9a6c4c] text-sm mt-1">{user?.email}</p>
             <p className="text-primary font-bold text-sm flex items-center gap-1 mt-2 bg-primary/5 px-4 py-1 rounded-full">
               <span className="material-symbols-outlined text-sm">verified</span>
-              {user?.badge || '領養人'}
+              {user?.role === 'admin' ? '系統管理員' : (user?.badge || '領養人')}
             </p>
-            <div className="grid grid-cols-3 w-full gap-4 mt-6 pt-6 border-t border-primary/5">
-              <StatItem label="已收藏" value={displayStats.favoritesCount} />
-              <StatItem label="諮詢中" value={displayStats.pendingApplicationsCount} />
-              <StatItem label="已領養" value={displayStats.adoptedCount} />
-            </div>
+
+            {user?.role !== 'admin' && (
+              <div className="grid grid-cols-3 w-full gap-4 mt-6 pt-6 border-t border-primary/5">
+                <StatItem label="已收藏" value={displayStats.favoritesCount} />
+                <StatItem label="諮詢中" value={displayStats.pendingApplicationsCount} />
+                <StatItem label="已領養" value={displayStats.adoptedCount} />
+              </div>
+            )}
           </div>
         </section>
 
-        <section className="mt-4 px-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold">申請進度</h3>
-            <button className="text-primary text-sm font-bold">歷史紀錄</button>
-          </div>
-          <div className="space-y-3">
-            {applications.map(app => (
-              <div key={app.id} className="flex items-center gap-4 rounded-2xl border border-primary/5 bg-white dark:bg-zinc-900/50 p-4 shadow-sm">
-                <div className={`size-12 rounded-xl flex items-center justify-center shrink-0 ${app.status === '審核中' ? 'bg-amber-100 text-amber-600' : app.status === '已通過' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
-                  <span className="material-symbols-outlined text-2xl">{app.status === '審核中' ? 'hourglass_top' : app.status === '已通過' ? 'task_alt' : 'cancel'}</span>
+        {user?.role !== 'admin' && (
+          <section className="mt-4 px-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold">申請進度</h3>
+              <button className="text-primary text-sm font-bold">歷史紀錄</button>
+            </div>
+            <div className="space-y-3">
+              {applications.map(app => (
+                <div key={app.id} className="flex items-center gap-4 rounded-2xl border border-primary/5 bg-white dark:bg-zinc-900/50 p-4 shadow-sm">
+                  <div className={`size-12 rounded-xl flex items-center justify-center shrink-0 ${app.status === '審核中' ? 'bg-amber-100 text-amber-600' : app.status === '已通過' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                    <span className="material-symbols-outlined text-2xl">{app.status === '審核中' ? 'hourglass_top' : app.status === '已通過' ? 'task_alt' : 'cancel'}</span>
+                  </div>
+                  <div className="flex flex-col flex-1">
+                    <h4 className="text-base font-bold">{app.petName} 的申請</h4>
+                    <p className="text-[#9a6c4c] text-xs font-medium">{app.petBreed} • {app.status}</p>
+                  </div>
+                  <button className="text-primary font-bold text-xs bg-primary/5 px-3 py-2 rounded-lg">查看詳情</button>
                 </div>
-                <div className="flex flex-col flex-1">
-                  <h4 className="text-base font-bold">{app.petName} 的申請</h4>
-                  <p className="text-[#9a6c4c] text-xs font-medium">{app.petBreed} • {app.status}</p>
-                </div>
-                <button className="text-primary font-bold text-xs bg-primary/5 px-3 py-2 rounded-lg">查看詳情</button>
-              </div>
-            ))}
-          </div>
-        </section>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="mt-8 px-4">
           <div className="bg-white dark:bg-zinc-900/50 rounded-2xl border border-primary/5 overflow-hidden divide-y divide-primary/5">
-            <MenuLink icon="person_search" label="領養偏好設定" onClick={() => alert('即將推出！')} />
-            <MenuLink icon="favorite" label="管理收藏毛孩" onClick={() => onNavigate(Screen.FAVORITES)} />
-            <MenuLink icon="history_edu" label="領養與切結書範本" onClick={() => alert('即將推出！')} />
-            <MenuLink icon="support_agent" label="聯絡客服志工" onClick={() => onNavigate(Screen.CHAT_LIST)} />
-            <MenuLink icon="logout" label="登出帳號" color="text-red-500" onClick={() => setShowLogoutConfirm(true)} />
+            {user?.role === 'admin' ? (
+              <>
+                <MenuLink icon="dashboard" label="返回管理儀表板" color="text-primary" onClick={() => onNavigate(Screen.ADMIN_DASHBOARD)} />
+                <MenuLink icon="logout" label="登出管理系統" color="text-red-500" onClick={() => setShowLogoutConfirm(true)} />
+              </>
+            ) : (
+              <>
+                <MenuLink icon="person_search" label="領養偏好設定" onClick={() => alert('即將推出！')} />
+                <MenuLink icon="favorite" label="管理收藏毛孩" onClick={() => onNavigate(Screen.FAVORITES)} />
+                <MenuLink icon="history_edu" label="領養與切結書範本" onClick={() => alert('即將推出！')} />
+                <MenuLink icon="support_agent" label="聯絡客服志工" onClick={() => onNavigate(Screen.CHAT_LIST)} />
+                <MenuLink icon="logout" label="登出帳號" color="text-red-500" onClick={() => setShowLogoutConfirm(true)} />
+              </>
+            )}
           </div>
         </section>
       </main>
